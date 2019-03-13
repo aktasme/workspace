@@ -24,4 +24,14 @@ void Game::CreateRoot()
 {
     Board* root = new Board(":/root.txt", EIGHT_PUZZLE);
     root->print();
+
+	if(root->IsGoal())
+		std::cout << "Goal!" << std::endl;
+
+	root->MoveToDirection(Board::MoveDirection_right);
+	root->print();
+
+	if(root->IsGoal())
+		std::cout << "Goal!" << std::endl;
+
 }
