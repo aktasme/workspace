@@ -26,7 +26,8 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 HEADERS += \
     board.h \
-    game.h
+    game.h \
+    definitions.h
 
 RESOURCES += \
     resources.qrc

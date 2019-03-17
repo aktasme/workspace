@@ -10,10 +10,12 @@
 #ifndef GAME_H
 #define GAME_H
 
+#include "definitions.h"
+#include "board.h"
 
 class Game
 {
-    enum GameType
+	enum GameType
     {
         EIGHT_PUZZLE = 3
     };
@@ -22,7 +24,7 @@ public:
     Game();
     virtual ~Game();
 
-    void CreateRoot();
+	void DepthFirstSearch();
 };
 
 #endif // GAME_H

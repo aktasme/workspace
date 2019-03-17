@@ -8,30 +8,43 @@
  */
 
 #include "game.h"
-#include "board.h"
+#include <QElapsedTimer>
 
 Game::Game()
 {
     std::cout << "Game Started!" << std::endl;
-    CreateRoot();
+
+    /* For calculating elapsed time */
+    QElapsedTimer elapsedTimer;
+    elapsedTimer.start();
+
+	DepthFirstSearch();
+
+    std::cout << "Game Finished! (" << static_cast<float>(elapsedTimer.elapsed() / 1000) << " seconds)" << std::endl;
 }
 
 Game::~Game()
 {
 }
 
-void Game::CreateRoot()
+void Game::DepthFirstSearch()
 {
-    Board* root = new Board(":/root.txt", EIGHT_PUZZLE);
+    /* Initial state is created from given file */
+	Board* root = new Board(":/root.txt", EIGHT_PUZZLE);
+
+    std::cout << "Initial state:" << std::endl;
     root->print();
 
-	if(root->IsGoal())
-		std::cout << "Goal!" << std::endl;
+	if(root->IsSolvable())
+	{
+        std::cout << "This puzzle can be solved!" << std::endl;
+		root->DepthFirstSearch();
+	}
+	else
+	{
+		std::cout << "This puzzle is not solvable!" << std::endl;
+	}
 
-	root->MoveToDirection(Board::MoveDirection_right);
-	root->print();
-
-	if(root->IsGoal())
-		std::cout << "Goal!" << std::endl;
-
+	delete root;
 }
+
