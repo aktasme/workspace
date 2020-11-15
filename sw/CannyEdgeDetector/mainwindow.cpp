@@ -1,12 +1,11 @@
 /*
- * CannyEdgeDetecor: Software for edge detection
+ * CannyEdgeDetecor: Software foredge detection
  *
  * BLG 513E Image Processing HW#1
  *
  * Copyright (C)  Mehmet AKTAS 0504181576
  *
  */
-
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "gaussiankernel.h"
@@ -27,6 +26,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->pushButtonSelect, &QPushButton::clicked, this, &MainWindow::onSelectImageClicked);
     connect(ui->pushButtonCanny, &QPushButton::clicked, this, &MainWindow::onCalculateCanny);
     connect(ui->pushButtonSave, &QPushButton::clicked, this, &MainWindow::onSaveClicked);
+    connect(ui->spinBoxSigma, SIGNAL(valueChanged(int)), this, SLOT(onSigmaChanged(int)));
+    connect(ui->spinBoxKernelSize, SIGNAL(valueChanged(int)), this, SLOT(onKernelSizeChanged(int)));
+    connect(ui->spinBoxThresholdLow, SIGNAL(editingFinished()), this, SLOT(onThresholdLowChanged()));
+    connect(ui->spinBoxThresholdHigh, SIGNAL(editingFinished()), this, SLOT(onThresholdHighChanged()));
 }
 
 MainWindow::~MainWindow()
@@ -56,12 +59,12 @@ void MainWindow::convertToGrayScale(QImage& inputImage)
     else
     {
         QImage grayScaledImage(inputImage.size(), QImage::Format_Grayscale8);
-        for (int rawIndex = 0; rawIndex < image.height(); rawIndex++)
+        for(int rawIndex = 0; rawIndex < inputImage.height(); rawIndex++)
         {
             quint32* inputLine = reinterpret_cast<QRgb*>(inputImage.scanLine(rawIndex));
             quint8* outputLine = grayScaledImage.scanLine(rawIndex);
 
-            for (int columnIndex = 0; columnIndex < image.width(); columnIndex++)
+            for(int columnIndex = 0; columnIndex < inputImage.width(); columnIndex++)
             {
                 QRgb* inputPixel = inputLine + columnIndex;
                 quint8 grayPixel = qGray(*inputPixel);
@@ -75,47 +78,50 @@ void MainWindow::convertToGrayScale(QImage& inputImage)
 
 QImage MainWindow::convolution(const BaseKernel* kernel, const QImage& inputImage)
 {
+    qDebug() << "convolution::Enter";
+
     unsigned int kernelWidth = kernel->getWidth();
     unsigned int kernelHeight = kernel->getHeight();
     unsigned int offsetx = kernelWidth / 2;
     unsigned int offsety = kernelHeight / 2;
 
-    unsigned int imageWidth = static_cast<unsigned int>(image.width());
-    unsigned int imageheight = static_cast<unsigned int>(image.height());
+    unsigned int imageWidth = static_cast<unsigned int>(inputImage.width());
+    unsigned int imageheight = static_cast<unsigned int>(inputImage.height());
 
-    QImage out(image.size(), inputImage.format());
+    QImage out(inputImage.size(), inputImage.format());
     float sum;
 
     quint8 *line;
-    const quint8 *lookup_line;
+    const quint8 *lookupLine;
 
-    for (unsigned int y = 0; y < imageheight; y++)
+    for(unsigned int y = 0; y < imageheight; y++)
     {
         line = out.scanLine(y);
-        for (unsigned  x = 0; x < imageWidth; x++)
+        for(unsigned  x = 0; x < imageWidth; x++)
         {
             sum = 0;
 
-            for (unsigned int j = 0; j < kernelHeight; j++)
+            for(unsigned int j = 0; j < kernelHeight; j++)
             {
                 if (y + j < offsety || y + j >= imageheight)
                 {
                     continue;
                 }
 
-                lookup_line = image.constScanLine(y + j - offsety);
+                lookupLine = inputImage.constScanLine(y + j - offsety);
 
-                for (unsigned  i = 0; i < kernelWidth; i++)
+                for(unsigned  i = 0; i < kernelWidth; i++)
                 {
                     if (x + i < offsetx || x + i >= imageWidth)
                     {
                         continue;
                     }
 
-                    sum += kernel->value(j, i) * lookup_line[x + i - offsetx];
+                    sum += kernel->value(j, i) * lookupLine[x + i - offsetx];
                 }
             }
 
+            sum = abs(sum);
             line[x] = qBound(0x00, static_cast<int>(sum), 0xFF);
         }
     }
@@ -125,6 +131,8 @@ QImage MainWindow::convolution(const BaseKernel* kernel, const QImage& inputImag
 
 void MainWindow::gradientMagnitude(QImage& inputImage, QImage& gradientX, QImage& gradientY)
 {
+    qDebug() << "gradientMagnitude::Enter";
+
     quint8 *line;
     const quint8 *gradientXline;
     const quint8 *gradientYline;
@@ -146,8 +154,15 @@ void MainWindow::smoothing(QImage& inputImage)
 {
     qDebug() << "smoothing::Enter";
 
-    GaussianKernel* kernel = new GaussianKernel(1.0f, 5);
-    inputImage = convolution(kernel, inputImage);
+    if(sigma < 1.0)
+    {
+        inputImage = baseImage;
+    }
+    else
+    {
+        GaussianKernel* kernel = new GaussianKernel(sigma, kernelSize);
+        inputImage = convolution(kernel, inputImage);
+    }
 }
 
 void MainWindow::findingGradients(QImage& inputImage, QImage& gradientX, QImage& gradientY)
@@ -162,29 +177,32 @@ void MainWindow::findingGradients(QImage& inputImage, QImage& gradientX, QImage&
 
 void MainWindow::nonMaximumSuppression(QImage& inputImage, QImage& gradientX, QImage& gradientY)
 {
-    quint8 *line;
-    const quint8* prev_line;
-    const quint8* next_line;
-    const quint8* gx_line;
-    const quint8* gy_line;
+    qDebug() << "nonMaximumSuppression::Enter";
 
-    for (int y = 1; y < inputImage.height() - 1; y++)
+    quint8 *line;
+    const quint8* previousLine;
+    const quint8* nextLine;
+    const quint8* gradientXLine;
+    const quint8* gradientYLine;
+
+    for(int y = 1; y < inputImage.height() - 1; y++)
     {
         line = inputImage.scanLine(y);
-        prev_line = inputImage.scanLine(y - 1);
-        next_line = inputImage.scanLine(y + 1);
-        gx_line = gradientX.scanLine(y);
-        gy_line = gradientY.scanLine(y);
+        previousLine = inputImage.scanLine(y - 1);
+        nextLine = inputImage.scanLine(y + 1);
 
-        for (int x = 1; x < inputImage.width() - 1; x++)
+        gradientXLine = gradientX.scanLine(y);
+        gradientYLine = gradientY.scanLine(y);
+
+        for(int x = 1; x < inputImage.width() - 1; x++)
         {
-            double at = atan2(gy_line[x], gx_line[x]);
+            double at = atan2(gradientYLine[x], gradientXLine[x]);
             const double dir = fmod(at + M_PI, M_PI) / M_PI * 8;
 
-            if ((1 >= dir || dir > 7) && line[x - 1] < line[x] && line[x + 1] < line[x] ||
-                (1 < dir || dir <= 3) && prev_line[x - 1] < line[x] && next_line[x + 1] < line[x] ||
-                (3 < dir || dir <= 5) && prev_line[x] < line[x] && next_line[x] < line[x] ||
-                (5 < dir || dir <= 7) && prev_line[x + 1] < line[x] && next_line[x - 1] < line[x])
+            if (((1 >= dir || dir > 7) && line[x - 1] < line[x] && line[x + 1] < line[x]) ||
+                ((1 < dir || dir <= 3) && previousLine[x - 1] < line[x] && nextLine[x + 1] < line[x]) ||
+                ((3 < dir || dir <= 5) && previousLine[x] < line[x] && nextLine[x] < line[x]) ||
+                ((5 < dir || dir <= 7) && previousLine[x + 1] < line[x] && nextLine[x - 1] < line[x]))
                 continue;
 
             line[x] = 0x00;
@@ -194,26 +212,26 @@ void MainWindow::nonMaximumSuppression(QImage& inputImage, QImage& gradientX, QI
 
 void MainWindow::doubleThresholdingAndEdgeTracking(QImage& inputImage)
 {
-    float tmin = 40;
-    float tmax = 80;
+    qDebug() << "nonMaximumSuppression::Enter";
+
     QImage outputImage = QImage(inputImage.size(), inputImage.format());
     outputImage.fill(0x00);
 
-    const quint8 *original_line;
-    quint8 *result_line;
+    const quint8 *inputLine;
+    quint8 *outputLine;
     int ni, nj;
     std::queue<std::pair<int, int>> edges;
 
-    for (int y = 1; y < outputImage.height() - 1; y++)
+    for(int y = 1; y < outputImage.height() - 1; y++)
     {
-        original_line = inputImage.constScanLine(y);
-        result_line = outputImage.scanLine(y);
+        inputLine = inputImage.constScanLine(y);
+        outputLine = outputImage.scanLine(y);
 
-        for (int x = 1; x < outputImage.width() - 1; x++)
+        for(int x = 1; x < outputImage.width() - 1; x++)
         {
-            if (original_line[x] >= tmax && result_line[x] == 0x00)
+            if (inputLine[x] >= thresholdMax && outputLine[x] == 0x00)
             {
-                result_line[x] = 0xFF;
+                outputLine[x] = 0xFF;
                 edges.push(std::make_pair(x, y));
 
                 while (!edges.empty())
@@ -221,18 +239,18 @@ void MainWindow::doubleThresholdingAndEdgeTracking(QImage& inputImage)
                     auto point = edges.front();
                     edges.pop();
 
-                    for (int j = -1; j <= 1; j++)
+                    for(int j = -1; j <= 1; j++)
                     {
                         nj = point.second + j;
-                        if (nj < 0 || nj >= image.height())
+                        if (nj < 0 || nj >= inputImage.height())
                         {
                             continue;
                         }
 
-                        original_line = image.constScanLine(nj);
-                        result_line = outputImage.scanLine(nj);
+                        inputLine = inputImage.constScanLine(nj);
+                        outputLine = outputImage.scanLine(nj);
 
-                        for (int i = -1; i <= 1; i++)
+                        for(int i = -1; i <= 1; i++)
                         {
                             if (!i && !j)
                             {
@@ -240,14 +258,14 @@ void MainWindow::doubleThresholdingAndEdgeTracking(QImage& inputImage)
                             }
 
                             ni = point.first + i;
-                            if (ni < 0 || ni >= image.width())
+                            if (ni < 0 || ni >= inputImage.width())
                             {
                                 continue;
                             }
 
-                            if (original_line[ni] >= tmin && result_line[ni] == 0x00)
+                            if (inputLine[ni] >= thresholdMin && outputLine[ni] == 0x00)
                             {
-                                result_line[ni] = 0xFF;
+                                outputLine[ni] = 0xFF;
                                 edges.push(std::make_pair(ni, nj));
                             }
                         }
@@ -265,22 +283,34 @@ void MainWindow::onSelectImageClicked()
     qDebug() << "onSelectImage::Enter";
 
     fileName = QFileDialog::getOpenFileName(this, tr("Select Image"));
-    image = QImage(fileName);
-    displayImage(image);
+    baseImage = QImage(fileName);
+    resultImage = baseImage;
+    displayImage(resultImage);
+    ui->pushButtonCanny->setEnabled(true);
 }
 
 void MainWindow::onCalculateCanny()
 {
     qDebug() << "onCannyButtonClicked::Enter";
+
+    resultImage = baseImage;
+
     QImage gradientX;
     QImage gradientY;
 
-    convertToGrayScale(image);
-    smoothing(image);
-    findingGradients(image, gradientX, gradientY);
-    nonMaximumSuppression(image, gradientX, gradientY);
-    doubleThresholdingAndEdgeTracking(image);
-    displayImage(image);
+    convertToGrayScale(resultImage);
+    smoothing(resultImage);
+    findingGradients(resultImage, gradientX, gradientY);
+    nonMaximumSuppression(resultImage, gradientX, gradientY);
+    doubleThresholdingAndEdgeTracking(resultImage);
+
+    displayImage(resultImage);
+
+    ui->spinBoxSigma->setEnabled(true);
+    ui->spinBoxKernelSize->setEnabled(true);
+    ui->spinBoxThresholdLow->setEnabled(true);
+    ui->spinBoxThresholdHigh->setEnabled(true);
+    ui->pushButtonSave->setEnabled(true);
 }
 
 void MainWindow::onSaveClicked()
@@ -289,5 +319,49 @@ void MainWindow::onSaveClicked()
 
     QString path = QFileDialog::getExistingDirectory(this, tr("Destination"));
     QString name = "Canny_" + QFileInfo(fileName).fileName();
-    image.save(QDir(path).filePath(name));
+    resultImage.save(QDir(path).filePath(name));
+}
+
+void MainWindow::onSigmaChanged(int value)
+{
+    ui->spinBoxSigma->setEnabled(false);
+
+    sigma = static_cast<float>(value);
+
+    qDebug() << "onSaveClicked::Enter sigma:" << sigma;
+
+    emit onCalculateCanny();
+}
+
+void MainWindow::onKernelSizeChanged(int value)
+{
+    ui->spinBoxKernelSize->setEnabled(false);
+
+    kernelSize = static_cast<unsigned int>(value);
+
+    qDebug() << "onSaveClicked::Enter kernelSize:" << kernelSize;
+
+    emit onCalculateCanny();
+}
+
+void MainWindow::onThresholdLowChanged()
+{
+    ui->spinBoxThresholdLow->setEnabled(true);
+
+    thresholdMin = static_cast<float>(ui->spinBoxThresholdLow->value());
+
+    qDebug() << "onSaveClicked::Enter thresholdMin:" << thresholdMin;
+
+    emit onCalculateCanny();
+}
+
+void MainWindow::onThresholdHighChanged()
+{
+    ui->spinBoxThresholdHigh->setEnabled(true);
+
+    thresholdMax = static_cast<float>(ui->spinBoxThresholdHigh->value());
+
+    qDebug() << "onSaveClicked::Enter thresholdMax:" << thresholdMax;
+
+    emit onCalculateCanny();
 }

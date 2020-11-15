@@ -42,12 +42,22 @@ public slots:
     void onSelectImageClicked();
     void onCalculateCanny();
     void onSaveClicked();
+    void onSigmaChanged(int value);
+    void onKernelSizeChanged(int value);
+    void onThresholdLowChanged();
+    void onThresholdHighChanged();
 
 private:
     Ui::MainWindow *ui;
 
+    float sigma = 1.0f;
+    unsigned int kernelSize = 5;
+    float thresholdMin = 40.0f;
+    float thresholdMax = 120.0f;
+
     QString fileName;
-    QImage image;
+    QImage baseImage;
+    QImage resultImage;
     QGraphicsScene graphicScene;
 };
 #endif // MAINWINDOW_H

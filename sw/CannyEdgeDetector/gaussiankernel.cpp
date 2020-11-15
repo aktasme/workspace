@@ -7,7 +7,7 @@
  *
  */
 #include "gaussiankernel.h"
-#include "math.h"
+#include <cmath>
 
 GaussianKernel::GaussianKernel(const float sigma, const unsigned int size)
     : BaseKernel(size)
