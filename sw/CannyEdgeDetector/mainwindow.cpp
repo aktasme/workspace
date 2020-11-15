@@ -180,14 +180,19 @@ void MainWindow::nonMaximumSuppression(QImage& inputImage, QImage& gradientX, QI
     qDebug() << "nonMaximumSuppression::Enter";
 
     quint8 *line;
+    quint8 *thinLine;
     const quint8* previousLine;
     const quint8* nextLine;
     const quint8* gradientXLine;
     const quint8* gradientYLine;
 
+    QImage thinImage = inputImage;
+
     for(int y = 1; y < inputImage.height() - 1; y++)
     {
         line = inputImage.scanLine(y);
+        thinLine = thinImage.scanLine(y);
+
         previousLine = inputImage.scanLine(y - 1);
         nextLine = inputImage.scanLine(y + 1);
 
@@ -196,18 +201,48 @@ void MainWindow::nonMaximumSuppression(QImage& inputImage, QImage& gradientX, QI
 
         for(int x = 1; x < inputImage.width() - 1; x++)
         {
-            double at = atan2(gradientYLine[x], gradientXLine[x]);
-            const double dir = fmod(at + M_PI, M_PI) / M_PI * 8;
+            double angle = atan2(gradientYLine[x], gradientXLine[x]) * 180 / M_PI;
 
-            if (((1 >= dir || dir > 7) && line[x - 1] < line[x] && line[x + 1] < line[x]) ||
-                ((1 < dir || dir <= 3) && previousLine[x - 1] < line[x] && nextLine[x + 1] < line[x]) ||
-                ((3 < dir || dir <= 5) && previousLine[x] < line[x] && nextLine[x] < line[x]) ||
-                ((5 < dir || dir <= 7) && previousLine[x + 1] < line[x] && nextLine[x - 1] < line[x]))
-                continue;
-
-            line[x] = 0x00;
+            if( ((angle > -22.5) && (angle <= 22.5 )) || ((angle > 157.5) && (angle <= -157.5 )) )
+            {
+                /* Horizantal edge */
+                if(line[x] < previousLine[x] || line[x] < nextLine[x])
+                {
+                    thinLine[x] = 0x00;
+                }
+            }
+            else if(((angle > -112.5) && (angle < -67.5 )) || ((angle > 67.5) && (angle < 112.5 )))
+            {
+                /* Vertical edge */
+                if(line[x] < line[x+1] || line[x] < line[x-1])
+                {
+                    thinLine[x] = 0x00;
+                }
+            }
+            else if(((angle > -67.5) && (angle < -22.5 )) || ((angle > 112.5) && (angle < 157.5 )))
+            {
+                /* -45 degree edge */
+                if(line[x] < previousLine[x-1] || line[x] < nextLine[x+1])
+                {
+                    thinLine[x] = 0x00;
+                }
+            }
+            else if(((angle > -157.5) && (angle < -112.5 )) || ((angle > 22.5) && (angle < 67.5 )))
+            {
+                /* 45 degree edge */
+                if(line[x] < previousLine[x+1] || line[x] < nextLine[x-1])
+                {
+                    thinLine[x] = 0x00;
+                }
+            }
+            else
+            {
+                thinLine[x] = line[x];
+            }
         }
     }
+
+    inputImage = thinImage;
 }
 
 void MainWindow::doubleThresholdingAndEdgeTracking(QImage& inputImage)
