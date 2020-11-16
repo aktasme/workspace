@@ -201,6 +201,11 @@ void MainWindow::nonMaximumSuppression(QImage& inputImage, QImage& gradientX, QI
 
         for(int x = 1; x < inputImage.width() - 1; x++)
         {
+            if(line[x] == 0x00)
+            {
+                continue;
+            }
+
             double angle = atan2(gradientYLine[x], gradientXLine[x]) * 180 / M_PI;
 
             if( ((angle > -22.5) && (angle <= 22.5 )) || ((angle > 157.5) && (angle <= -157.5 )) )
@@ -245,72 +250,91 @@ void MainWindow::nonMaximumSuppression(QImage& inputImage, QImage& gradientX, QI
     inputImage = thinImage;
 }
 
-void MainWindow::doubleThresholdingAndEdgeTracking(QImage& inputImage)
+void MainWindow::doubleThresholding(QImage& inputImage, const float thresholdMin, const float thresholdMax)
 {
-    qDebug() << "nonMaximumSuppression::Enter";
+    qDebug() << "doubleThresholding::Enter";
 
-    QImage outputImage = QImage(inputImage.size(), inputImage.format());
-    outputImage.fill(0x00);
+    quint8 *line;
 
-    const quint8 *inputLine;
-    quint8 *outputLine;
-    int ni, nj;
-    std::queue<std::pair<int, int>> edges;
-
-    for(int y = 1; y < outputImage.height() - 1; y++)
+    for(int y = 0; y < inputImage.height(); y++)
     {
-        inputLine = inputImage.constScanLine(y);
-        outputLine = outputImage.scanLine(y);
+        line = inputImage.scanLine(y);
 
-        for(int x = 1; x < outputImage.width() - 1; x++)
+        for(int x = 0; x < inputImage.width(); x++)
         {
-            if (inputLine[x] >= thresholdMax && outputLine[x] == 0x00)
+            if(line[x] < thresholdMin)
             {
-                outputLine[x] = 0xFF;
-                edges.push(std::make_pair(x, y));
+                /* No edge */
+                line[x] = 0x00;
+            }
+            else if(line[x] > thresholdMax)
+            {
+                /* Strong edges */
+                strongEdges.push(std::make_pair(x, y));
+                line[x] = 0xFF;
+            }
+            else
+            {
+                /* Weak edge */
+                weakEdges.push(std::make_pair(x, y));
+            }
+        }
+    }
+}
 
-                while (!edges.empty())
+void MainWindow::edgeTracking(QImage& inputImage, const float thresholdMin, const float thresholdMax)
+{
+    qDebug() << "edgeTracking::Enter";
+
+    quint8 *line;
+
+    while(!strongEdges.empty())
+    {
+        int x = strongEdges.front().first;
+        int y = strongEdges.front().second;
+        strongEdges.pop();
+
+        for(int i = -2; i <= 2; i++)
+        {
+            int neighbourY = y + i;
+
+            if(neighbourY >= inputImage.height() || (neighbourY < 0))
+            {
+                continue;
+            }
+
+            line = inputImage.scanLine(neighbourY);
+
+            for(int j = -2; j <= 2; j++)
+            {
+                int neighbourX = x + j;
+
+                if(neighbourX >= inputImage.width() || (neighbourX < 0))
                 {
-                    auto point = edges.front();
-                    edges.pop();
+                    continue;
+                }
 
-                    for(int j = -1; j <= 1; j++)
-                    {
-                        nj = point.second + j;
-                        if (nj < 0 || nj >= inputImage.height())
-                        {
-                            continue;
-                        }
-
-                        inputLine = inputImage.constScanLine(nj);
-                        outputLine = outputImage.scanLine(nj);
-
-                        for(int i = -1; i <= 1; i++)
-                        {
-                            if (!i && !j)
-                            {
-                                continue;
-                            }
-
-                            ni = point.first + i;
-                            if (ni < 0 || ni >= inputImage.width())
-                            {
-                                continue;
-                            }
-
-                            if (inputLine[ni] >= thresholdMin && outputLine[ni] == 0x00)
-                            {
-                                outputLine[ni] = 0xFF;
-                                edges.push(std::make_pair(ni, nj));
-                            }
-                        }
-                    }
+                if(line[neighbourX] > thresholdMin && line[neighbourX] < thresholdMax)
+                {
+                    line[x] = 0xFF;
+                    strongEdges.push(std::make_pair(neighbourX, neighbourY));
                 }
             }
         }
     }
 
-    inputImage = outputImage;
+    while(!weakEdges.empty())
+    {
+        /* Clean remaining */
+        int x = weakEdges.front().first;
+        int y = weakEdges.front().second;
+        weakEdges.pop();
+
+        if(inputImage.pixel(x, y) != 0xFF)
+        {
+            inputImage.setPixel(x, y, 0x00);
+        }
+    }
 }
 
 void MainWindow::onSelectImageClicked()
@@ -337,7 +361,8 @@ void MainWindow::onCalculateCanny()
     smoothing(resultImage);
     findingGradients(resultImage, gradientX, gradientY);
     nonMaximumSuppression(resultImage, gradientX, gradientY);
-    doubleThresholdingAndEdgeTracking(resultImage);
+    doubleThresholding(resultImage, thresholdMin, thresholdMax);
+    edgeTracking(resultImage, thresholdMin, thresholdMax);
 
     displayImage(resultImage);
 

@@ -13,6 +13,7 @@
 #include <QMainWindow>
 #include <QGraphicsScene>
 #include "basekernel.h"
+#include <queue>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -21,6 +22,8 @@ QT_END_NAMESPACE
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
+
+    typedef std::queue<std::pair<int, int>> Edges;
 
 public:
     MainWindow(QWidget *parent = nullptr);
@@ -36,7 +39,8 @@ public:
     void smoothing(QImage& inputImage);
     void findingGradients(QImage& inputImage, QImage& gradientX, QImage& gradientY);
     void nonMaximumSuppression(QImage& inputImage, QImage& gradientX, QImage& gradientY);
-    void doubleThresholdingAndEdgeTracking(QImage& inputImage);
+    void doubleThresholding(QImage& inputImage, const float thresholdMin, const float thresholdMax);
+    void edgeTracking(QImage& inputImage, const float thresholdMin, const float thresholdMax);
 
 public slots:
     void onSelectImageClicked();
@@ -59,5 +63,7 @@ private:
     QImage baseImage;
     QImage resultImage;
     QGraphicsScene graphicScene;
+    Edges strongEdges;
+    Edges weakEdges;
 };
 #endif // MAINWINDOW_H
