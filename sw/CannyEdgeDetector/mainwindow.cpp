@@ -23,6 +23,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
+    /* UI connections */
     connect(ui->pushButtonSelect, &QPushButton::clicked, this, &MainWindow::onSelectImageClicked);
     connect(ui->pushButtonCanny, &QPushButton::clicked, this, &MainWindow::onCalculateCanny);
     connect(ui->pushButtonSave, &QPushButton::clicked, this, &MainWindow::onSaveClicked);
@@ -37,6 +38,7 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+/* Displays given image */
 void MainWindow::displayImage(const QImage& inputImage)
 {
     qDebug() << "displayImage::Enter";
@@ -48,6 +50,7 @@ void MainWindow::displayImage(const QImage& inputImage)
     ui->graphicsView->fitInView(graphicScene.sceneRect(), Qt::KeepAspectRatio);
 }
 
+/* Converts image to grayscale */
 void MainWindow::convertToGrayScale(QImage& inputImage)
 {
     qDebug() << "convertToGrayScale::Enter";
@@ -76,6 +79,7 @@ void MainWindow::convertToGrayScale(QImage& inputImage)
     }
 }
 
+/* Convols image with given kernel */
 QImage MainWindow::convolution(const BaseKernel* kernel, const QImage& inputImage)
 {
     qDebug() << "convolution::Enter";
@@ -129,6 +133,7 @@ QImage MainWindow::convolution(const BaseKernel* kernel, const QImage& inputImag
     return out;
 }
 
+/* Calculates gradient magnitude with given gradients */
 void MainWindow::gradientMagnitude(QImage& inputImage, QImage& gradientX, QImage& gradientY)
 {
     qDebug() << "gradientMagnitude::Enter";
@@ -150,6 +155,7 @@ void MainWindow::gradientMagnitude(QImage& inputImage, QImage& gradientX, QImage
     }
 }
 
+/* Smooths image with using Gaussian Kernel */
 void MainWindow::smoothing(QImage& inputImage)
 {
     qDebug() << "smoothing::Enter";
@@ -165,6 +171,7 @@ void MainWindow::smoothing(QImage& inputImage)
     }
 }
 
+/* Finds gradients using Sobel kernel */
 void MainWindow::findingGradients(QImage& inputImage, QImage& gradientX, QImage& gradientY)
 {
     SobelXKernel sobelX;
@@ -175,6 +182,7 @@ void MainWindow::findingGradients(QImage& inputImage, QImage& gradientX, QImage&
     gradientMagnitude(inputImage, gradientX, gradientY);
 }
 
+/* Thinning the edges */
 void MainWindow::nonMaximumSuppression(QImage& inputImage, QImage& gradientX, QImage& gradientY)
 {
     qDebug() << "nonMaximumSuppression::Enter";
@@ -250,6 +258,7 @@ void MainWindow::nonMaximumSuppression(QImage& inputImage, QImage& gradientX, QI
     inputImage = thinImage;
 }
 
+/* Finds strong and weak edges. Clears the image. */
 void MainWindow::doubleThresholding(QImage& inputImage, const float thresholdMin, const float thresholdMax)
 {
     qDebug() << "doubleThresholding::Enter";
@@ -282,6 +291,7 @@ void MainWindow::doubleThresholding(QImage& inputImage, const float thresholdMin
     }
 }
 
+/* Finds weak edges connected to strong ones and make them strong. */
 void MainWindow::edgeTracking(QImage& inputImage, const float thresholdMin, const float thresholdMax)
 {
     qDebug() << "edgeTracking::Enter";
@@ -294,6 +304,7 @@ void MainWindow::edgeTracking(QImage& inputImage, const float thresholdMin, cons
         int y = strongEdges.front().second;
         strongEdges.pop();
 
+        /* Looks the 2nd level neighbourhood to strong edges */
         for(int i = -2; i <= 2; i++)
         {
             int neighbourY = y + i;
@@ -305,6 +316,7 @@ void MainWindow::edgeTracking(QImage& inputImage, const float thresholdMin, cons
 
             line = inputImage.scanLine(neighbourY);
 
+            /* Looks the 2nd level neighbourhood to strong edges */
             for(int j = -2; j <= 2; j++)
             {
                 int neighbourX = x + j;
@@ -323,6 +335,7 @@ void MainWindow::edgeTracking(QImage& inputImage, const float thresholdMin, cons
         }
     }
 
+    /* Lastly, clear the image from remaining weak edges */
     while(!weakEdges.empty())
     {
         /* Clean remaining */
@@ -337,6 +350,7 @@ void MainWindow::edgeTracking(QImage& inputImage, const float thresholdMin, cons
     }
 }
 
+/* Called on image selection */
 void MainWindow::onSelectImageClicked()
 {
     qDebug() << "onSelectImage::Enter";
@@ -348,6 +362,7 @@ void MainWindow::onSelectImageClicked()
     ui->pushButtonCanny->setEnabled(true);
 }
 
+/* Called on clicking Canny button */
 void MainWindow::onCalculateCanny()
 {
     qDebug() << "onCannyButtonClicked::Enter";
@@ -373,6 +388,7 @@ void MainWindow::onCalculateCanny()
     ui->pushButtonSave->setEnabled(true);
 }
 
+/* Called on clicking Save button */
 void MainWindow::onSaveClicked()
 {
     qDebug() << "onSaveClicked::Enter";
@@ -382,6 +398,7 @@ void MainWindow::onSaveClicked()
     resultImage.save(QDir(path).filePath(name));
 }
 
+/* Called when sigma changed */
 void MainWindow::onSigmaChanged(int value)
 {
     ui->spinBoxSigma->setEnabled(false);
@@ -393,6 +410,7 @@ void MainWindow::onSigmaChanged(int value)
     emit onCalculateCanny();
 }
 
+/* Called when kernel size changed */
 void MainWindow::onKernelSizeChanged(int value)
 {
     ui->spinBoxKernelSize->setEnabled(false);
@@ -404,6 +422,7 @@ void MainWindow::onKernelSizeChanged(int value)
     emit onCalculateCanny();
 }
 
+/* Called when low thresold changed */
 void MainWindow::onThresholdLowChanged()
 {
     ui->spinBoxThresholdLow->setEnabled(true);
@@ -415,6 +434,7 @@ void MainWindow::onThresholdLowChanged()
     emit onCalculateCanny();
 }
 
+/* Called when highs thresold changed */
 void MainWindow::onThresholdHighChanged()
 {
     ui->spinBoxThresholdHigh->setEnabled(true);

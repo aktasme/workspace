@@ -21,7 +21,7 @@ GaussianKernel::GaussianKernel(const float sigma, const unsigned int size)
     int upperIndex = size / 2;
     int lowerIndex = -1 * upperIndex;
 
-    /* generating kernel */
+    /* generating Gaussian kernel */
     for (int x = lowerIndex; x <= upperIndex; x++)
     {
         for (int y = lowerIndex; y <= upperIndex; y++)

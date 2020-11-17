@@ -33,6 +33,7 @@ BaseKernel::BaseKernel(const unsigned int size)
 
 BaseKernel::~BaseKernel()
 {
+    /* Deallocate heap */
     for(unsigned int i = 0; i < height; i++)
     {
        delete[] kernel[i];
