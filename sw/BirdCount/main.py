@@ -85,25 +85,48 @@ def findBackground(img):
                     img[i,j] = 0
     return img
 
-def dilation(img, kernel):
+# Morphological Dilation with 3x3 Square Structuring Element
+def dilation(img):
+    # 3x3 Square Structuring Element
+    seSquare = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]]
     H,W = img.shape[:2]
-    for i in range(H):
-        for j in range(W):
-            img[i,j] = 0
-    return img    
+    dilationImage = np.zeros([H, W], dtype=np.uint8)
+    for i in range(2, H-2, 1):
+        for j in range(2, W-2, 1):
+            # If image pixel is white, make other pixels white with a neighborhood of structuring element
+            if(img[i,j] == 255):
+                for offset in seSquare:
+                    x = i + offset[1]
+                    y = j + offset[0]
+                    if(dilationImage[x,y] == 0):
+                        dilationImage[x,y] = 255            
+    return dilationImage    
 
-def erosian(img, kernel):
+# Morphological Erosion with 3x3 Square Structuring Element
+def erosion(img):
+   # 3x3 Square Structuring Element
+    seSquare = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]]
     H,W = img.shape[:2]
-    for i in range(H):
-        for j in range(W):
-            img[i,j] = 0
-    return img
+    erosionImage = np.zeros([H, W], dtype=np.uint8)
+    for i in range(2, H-2, 1):
+        for j in range(2, W-2, 1):
+            overlap = True
+            # If all pixels are overlapping with a neighborhood of structuring element make the center pixel white
+            for offset in seSquare:
+                x = i + offset[1]
+                y = j + offset[0]
+                if(img[x,y] == 0):
+                    overlap = False
+                    break
+            if(overlap == True):
+                erosionImage[i,j] = 255
+    return erosionImage    
 
 # Lables the neighbours of given pixel with given label counter
 # This function works recursively
 # Algorithm taken from course lectures (UCL-L1_Segmentation_02.pdf)
 def label(xStart, yStart, counter, image, labeledImage):
-    # Connectivity matrix of 4 neighborhoods 
+    # Connectivity matrix of 4-components neighborhood 
     connectivityMatrix = [[-1, 0], [0, -1], [0, 1], [1, 0]]
     labeledImage[xStart, yStart] = counter;
     H,W = image.shape[:2]
@@ -115,7 +138,7 @@ def label(xStart, yStart, counter, image, labeledImage):
         if(image[x,y] == 255 and labeledImage[x,y] == 0):
             label(x, y, counter, image, labeledImage)
 
-# Find the connected components using label function
+# Find the connected components using label function with 4-components neighborhood
 # Algorithm taken from course lectures (UCL-L1_Segmentation_02.pdf)
 def connectedComponents(image):
     H,W = image.shape[:2]
@@ -126,13 +149,12 @@ def connectedComponents(image):
             if(image[i,j]==255 and labeledImage[i,j]==0):
                 label(i, j, counter, image, labeledImage)
                 counter += 1
-    #labeledImage = np.stack((labeledImage,)*4, axis=-1)
     return counter, labeledImage
 
 print("Finding number of birds in images")
 
-# Read image
-fileName = 'bird_3.bmp'
+# Read image (bird_1.jpg, bird_2.jpg, bird_3.bmp)
+fileName = 'bird_1.jpg'
 image = plt.imread(fileName)
 
 # Displays image
@@ -169,17 +191,15 @@ plt.title('Background Correction')
 plt.xticks([]), plt.yticks([])
 
 # Morphological Opening (Dilation and Erosian)
-# These functions are used from openCV
-kernel = np.ones((3,3), np.uint8)
-image = cv2.erode(image, kernel, iterations=1)
-image = cv2.dilate(image, kernel, iterations=1)
+image = erosion(image)
+image = dilation(image)
 
 # Displays image
 plt.subplot(3, 2, 5), plt.imshow(image, 'gray')
 plt.title('Morphological Opening')
 plt.xticks([]), plt.yticks([])
 
-# Finding connected components with 4 neighborhoods
+# Finding connected components with 4-components neighborhood
 ret, labels = connectedComponents(image)
 
 # One of the label is background
@@ -188,6 +208,7 @@ numberOfBirds = ret - 1
 
 # For assigning different colors to each bird
 # OpenCV functions are used for generating colored images
+# This block is taken from the internet
 labelHue = np.uint8(200 * labels / np.max(labels))
 blankChannel = 255 * np.ones_like(labelHue)
 image = cv2.merge([labelHue, blankChannel, blankChannel])
@@ -199,11 +220,10 @@ plt.subplot(3, 2, 6), plt.imshow(image, 'gray')
 plt.title('Connected Components\nNumber of Birds: ' + str(numberOfBirds))
 plt.xticks([]), plt.yticks([])
 
-resultFile = 'Result_' + fileName + '.jpg'
-plt.savefig(resultFile)
+plt.savefig('Result.jpg')
 
-print("Number of Birds: " + str(numberOfBirds))
-print("Result image recorded to " + resultFile)
+print('Number of Birds: ' + str(numberOfBirds))
+print('Result image recorded to Result.jpg')
 
 # Displays subplotted images
 plt.show()
