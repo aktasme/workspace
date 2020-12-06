@@ -18,35 +18,15 @@ def rgb2gray(img):
             gray[i,j] = np.clip(0.07 * img[i,j,0] + 0.72 * img[i,j,1] + 0.21 * img[i,j,2], 0, 255)    
     return gray
 
-# Converts pixel values according to background decision
-# Counts zero(0x00) and one(0xFF) pixels in the image
-def findBackground(img):
-    zeros = 0
-    ones = 0
-    H,W = img.shape[:2]
-    for i in range(H):
-        for j in range(W):
-            if(img[i,j] == 0):
-                zeros += 1
-            else:
-                ones += 1
-
-    # Convert foreground and background pixels
-    if(ones > zeros):
-        for i in range(H):
-            for j in range(W):
-                if(img[i,j] == 0):
-                    img[i,j] = 255
-                else:
-                    img[i,j] = 0
-
-    return img
-
+# K Means Clustering algorithm for calculating threshold
+# Threshold value is strengthened after K Means
 def kMeansClustering(img):
     threshold = 0
     newThreshold = 128
     counter = 0
+    # Continue until the threshold value is 0.1 near from the previous one
     while(abs(threshold - newThreshold) > 0.1):
+        # Initialize sum and count values
         threshold = newThreshold
         foregroundSum = 0
         backgroundSum = 0
@@ -64,11 +44,11 @@ def kMeansClustering(img):
                     backgroundSum += pixel
         foregroundMean = foregroundSum / foregroundCount
         backgroundMean = backgroundSum / backgroundCount
-        #print('Foreground Count:' + str(foregroundCount) + ' Sum:' + str(foregroundSum) + ' Mean:' + str(foregroundMean))
-        #print('Background Count:' + str(backgroundCount) + ' Sum:' + str(backgroundSum) + ' Mean:' + str(backgroundMean))
         newThreshold = (foregroundMean + backgroundMean) / 2
+    newThreshold = newThreshold + ( 1.95 * (newThreshold - 128))
     return newThreshold
 
+# Calculated threshold is applied to an image
 def thresholding(img, threshold):
     H,W = img.shape[:2]
     for i in range(H):
@@ -79,73 +59,133 @@ def thresholding(img, threshold):
                 img[i,j] = 0
     return img
 
+# Converts pixel values according to background decision
+# Counts zero(0x00) and one(0xFF) pixels in the image
+# Reverts zeros and ones if needed
+def findBackground(img):
+    zeros = 0
+    ones = 0
+    H,W = img.shape[:2]
+    for i in range(H):
+        for j in range(W):
+            if(img[i,j] == 0):
+                zeros += 1
+            else:
+                ones += 1
+    # Convert foreground and background pixels
+    if(ones > zeros):
+        for i in range(H):
+            for j in range(W):
+                if(img[i,j] == 0):
+                    img[i,j] = 255
+                else:
+                    img[i,j] = 0
+    return img
+
+def dilation(img, kernel):
+    H,W = img.shape[:2]
+    for i in range(H):
+        for j in range(W):
+            img[i,j] = 0
+    return img    
+
+def erosian(img, kernel):
+    H,W = img.shape[:2]
+    for i in range(H):
+        for j in range(W):
+            img[i,j] = 0
+    return img
+
+# Lables the neighbours of given pixel with given label counter
+# This function works recursively
+# Algorithm taken from course lectures (UCL-L1_Segmentation_02.pdf)
+def label(xStart, yStart, counter, image, labeledImage):
+    # Connectivity matrix of 4 neighbourhood 
+    connectivityMatrix = [[-1, 0], [0, -1], [0, 1], [1, 0]]
+    labeledImage[xStart, yStart] = counter;
+    H,W = image.shape[:2]
+    for offset in connectivityMatrix:
+        x = xStart + offset[1]
+        y = yStart + offset[0]
+        if(x < 0 or x >= H or y < 0 or y >= W):
+            continue
+        if(image[x,y] == 255 and labeledImage[x,y] == 0):
+            label(x, y, counter, image, labeledImage)
+
+# Find the connected components using label function
+# Algorithm taken from course lectures (UCL-L1_Segmentation_02.pdf)
+def connectedComponents(image):
+    H,W = image.shape[:2]
+    labeledImage = np.zeros([H, W], dtype=np.uint16)
+    counter = 1
+    for i in range(H):
+        for j in range(W):
+            if(image[i,j]==255 and labeledImage[i,j]==0):
+                label(i, j, counter, image, labeledImage)
+                counter += 1
+    #labeledImage = np.stack((labeledImage,)*4, axis=-1)
+    return counter, labeledImage
 
 print("Finding number of birds in images")
 
 # Read image
 image = plt.imread('bird_1.jpg')
+
 plt.subplot(3, 2, 1), plt.imshow(image, 'gray')
 plt.title('Original')
 plt.xticks([]), plt.yticks([])
 
 # Convert to grayscale
 image = rgb2gray(image)
+
 plt.subplot(3, 2, 2), plt.imshow(image, 'gray')
 plt.title('Grayscale')
 plt.xticks([]), plt.yticks([])
 
+# K Means Clustering algorithm for calculating threshold
 threshold = kMeansClustering(image)
 print('Threshold:' + str(threshold))
 
-# Smooting
-#image = cv2.GaussianBlur(image, (5,5), 0)
-
-# Thresholding
-#image = cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 99, 20)
-
-#ret, image = cv2.threshold(image, threshold, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-#ret, image = cv2.threshold(image, threshold, 255, cv2.THRESH_BINARY)
-
+# Calculated threshold is applied to an image
 image = thresholding(image, threshold)
 plt.subplot(3, 2, 3), plt.imshow(image, 'gray')
 plt.title('Thresholding')
 plt.xticks([]), plt.yticks([])
 
-
-
+# Converts pixel values according to background decision
 image = findBackground(image)
 plt.subplot(3, 2, 4), plt.imshow(image, 'gray')
 plt.title('Background Correction')
 plt.xticks([]), plt.yticks([])
 
-# Dilation and Erosian
-#kernel = np.ones((5,5), np.uint8)
-#image = cv2.dilate(image, kernel, iterations=1)
-#image = cv2.erode(image, kernel, iterations=1)
-
-
-# noise removal
+# Morphological Opening (Dilation and Erosian)
+# These functions are used from openCV
 kernel = np.ones((3,3), np.uint8)
-image = cv2.morphologyEx(image, cv2.MORPH_OPEN, kernel, iterations = 1)
+image = cv2.erode(image, kernel, iterations=1)
+image = cv2.dilate(image, kernel, iterations=1)
 
 plt.subplot(3, 2, 5), plt.imshow(image, 'gray')
-plt.title('Opening')
+plt.title('Morphological Opening')
 plt.xticks([]), plt.yticks([])
 
+# Finding connected components with 4 neighbourhood
+ret, labels1 = connectedComponents(image)
 
-# clean all noise after dilatation and erosion
-#imgMedian = cv2.medianBlur(image, 7)
+# One of the label is background
+# Substract 1 to find the number of birds
+numberOfBirds = ret - 1
+print("connectedComponents ret:" + str(numberOfBirds))
 
-
-ret, labels = cv2.connectedComponents(image)
-labelHue = np.uint8(179 * labels / np.max(labels))
+# For assigning different colors to each bird
+# OpenCV functions are used for generating colored images
+labelHue = np.uint8(200 * labels1 / np.max(labels1))
 blankChannel = 255 * np.ones_like(labelHue)
 image = cv2.merge([labelHue, blankChannel, blankChannel])
 image = cv2.cvtColor(image, cv2.COLOR_HSV2BGR)
 image[labelHue == 0] = 0
 
 plt.subplot(3, 2, 6), plt.imshow(image, 'gray')
-plt.title('Result' + str(ret-1))
+plt.title('Connected Components\nNumber of Birds: ' + str(numberOfBirds))
 plt.xticks([]), plt.yticks([])
 
 plt.savefig('result.jpg')
