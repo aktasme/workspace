@@ -1,3 +1,11 @@
+############################################################# 
+# Bird Counting Algorithm                                   #
+#                                                           #
+# BLG 513E Image Processing HW#2                            #
+#                                                           #
+# Copyright (C)  Mehmet AKTAS 0504181576                    #
+#                                                           #
+#############################################################
 import cv2
 import math
 import numpy as np
