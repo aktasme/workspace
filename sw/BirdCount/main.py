@@ -5,7 +5,7 @@ import matplotlib.image as mpimg
 import matplotlib.pyplot as plt 
 
 # Convert rgb image to grayscale
-# Formulation: gray = 0.21R + 0.72G + 0.07B
+# Formulation: Gray = 0.21 Red + 0.72 Green + 0.07 Blue
 def rgb2gray(img):
     # Already GreyScale
     if(len(img.shape)<3):
@@ -20,6 +20,7 @@ def rgb2gray(img):
 
 # K Means Clustering algorithm for calculating threshold
 # Threshold value is strengthened after K Means
+# Algorithm taken from course lectures (UCL-L1_Segmentation_02.pdf)
 def kMeansClustering(img):
     threshold = 0
     newThreshold = 128
@@ -45,6 +46,8 @@ def kMeansClustering(img):
         foregroundMean = foregroundSum / foregroundCount
         backgroundMean = backgroundSum / backgroundCount
         newThreshold = (foregroundMean + backgroundMean) / 2
+    # This formulation is used to strengthen the threshold
+    # I have found the formulation with some iterations
     newThreshold = newThreshold + ( 1.95 * (newThreshold - 128))
     return newThreshold
 
@@ -100,7 +103,7 @@ def erosian(img, kernel):
 # This function works recursively
 # Algorithm taken from course lectures (UCL-L1_Segmentation_02.pdf)
 def label(xStart, yStart, counter, image, labeledImage):
-    # Connectivity matrix of 4 neighbourhood 
+    # Connectivity matrix of 4 neighborhoods 
     connectivityMatrix = [[-1, 0], [0, -1], [0, 1], [1, 0]]
     labeledImage[xStart, yStart] = counter;
     H,W = image.shape[:2]
@@ -129,8 +132,10 @@ def connectedComponents(image):
 print("Finding number of birds in images")
 
 # Read image
-image = plt.imread('bird_1.jpg')
+fileName = 'bird_3.bmp'
+image = plt.imread(fileName)
 
+# Displays image
 plt.subplot(3, 2, 1), plt.imshow(image, 'gray')
 plt.title('Original')
 plt.xticks([]), plt.yticks([])
@@ -138,6 +143,7 @@ plt.xticks([]), plt.yticks([])
 # Convert to grayscale
 image = rgb2gray(image)
 
+# Displays image
 plt.subplot(3, 2, 2), plt.imshow(image, 'gray')
 plt.title('Grayscale')
 plt.xticks([]), plt.yticks([])
@@ -148,12 +154,16 @@ print('Threshold:' + str(threshold))
 
 # Calculated threshold is applied to an image
 image = thresholding(image, threshold)
+
+# Displays image
 plt.subplot(3, 2, 3), plt.imshow(image, 'gray')
 plt.title('Thresholding')
 plt.xticks([]), plt.yticks([])
 
 # Converts pixel values according to background decision
 image = findBackground(image)
+
+# Displays image
 plt.subplot(3, 2, 4), plt.imshow(image, 'gray')
 plt.title('Background Correction')
 plt.xticks([]), plt.yticks([])
@@ -164,29 +174,36 @@ kernel = np.ones((3,3), np.uint8)
 image = cv2.erode(image, kernel, iterations=1)
 image = cv2.dilate(image, kernel, iterations=1)
 
+# Displays image
 plt.subplot(3, 2, 5), plt.imshow(image, 'gray')
 plt.title('Morphological Opening')
 plt.xticks([]), plt.yticks([])
 
-# Finding connected components with 4 neighbourhood
-ret, labels1 = connectedComponents(image)
+# Finding connected components with 4 neighborhoods
+ret, labels = connectedComponents(image)
 
 # One of the label is background
 # Substract 1 to find the number of birds
 numberOfBirds = ret - 1
-print("connectedComponents ret:" + str(numberOfBirds))
 
 # For assigning different colors to each bird
 # OpenCV functions are used for generating colored images
-labelHue = np.uint8(200 * labels1 / np.max(labels1))
+labelHue = np.uint8(200 * labels / np.max(labels))
 blankChannel = 255 * np.ones_like(labelHue)
 image = cv2.merge([labelHue, blankChannel, blankChannel])
 image = cv2.cvtColor(image, cv2.COLOR_HSV2BGR)
 image[labelHue == 0] = 0
 
+# Displays image
 plt.subplot(3, 2, 6), plt.imshow(image, 'gray')
 plt.title('Connected Components\nNumber of Birds: ' + str(numberOfBirds))
 plt.xticks([]), plt.yticks([])
 
-plt.savefig('result.jpg')
+resultFile = 'Result_' + fileName + '.jpg'
+plt.savefig(resultFile)
+
+print("Number of Birds: " + str(numberOfBirds))
+print("Result image recorded to " + resultFile)
+
+# Displays subplotted images
 plt.show()
