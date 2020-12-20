@@ -20,11 +20,35 @@ fileName = 'DataSet/Fire0.png'
 imageBackground = plt.imread(fileName)
 grayBackground = cv2.cvtColor(imageBackground, cv2.COLOR_BGR2GRAY)
 
-fileName = 'DataSet/Fire1.png'
+fileName = 'DataSet/Fire6.png'
 imageFire = plt.imread(fileName)
 grayFire = cv2.cvtColor(imageFire, cv2.COLOR_BGR2GRAY)
 
-(score, diff) = structural_similarity(grayBackground, grayFire, gaussian_weights=True, full=True, sigma=1)
+pointsSource = np.float32([[197,60],[1586,82],[1403, 992],[379,996]])
+#pointsDestination = np.float32([[197,60],[1586,82],[1586, 1450],[197,1472]])
+pointsDestination = np.float32([[0,0],[1600,0],[1600, 1600],[0,1600]])
+
+M = cv2.getPerspectiveTransform(pointsSource, pointsDestination)
+
+transformed = np.zeros((1600,1600), np.uint8)
+
+warpGrayBackground = cv2.warpPerspective(grayBackground, M, transformed.shape)
+#cv2.imshow("warpGrayBackground", warpGrayBackground) 
+warpGrayBackground = (warpGrayBackground * 255).astype("uint8")
+
+warpGrayFire = cv2.warpPerspective(grayFire, M, transformed.shape)
+#cv2.imshow("warpGrayFire", warpGrayFire)
+warpGrayFire = (warpGrayFire * 255).astype("uint8")
+
+warpFire = cv2.warpPerspective(imageFire, M, transformed.shape)
+#cv2.imshow("warpFire", warpFire)
+warpFire = (warpFire * 255).astype("uint8")
+
+cv2.imwrite('DataSet/warpGrayBackground.png', warpGrayBackground) 
+cv2.imwrite('DataSet/warpGrayFire.png', warpGrayFire) 
+cv2.imwrite('DataSet/warpFire.png', warpFire) 
+
+(score, diff) = structural_similarity(warpGrayBackground, warpGrayFire, gaussian_weights=True, full=True, sigma=1)
 print("Image similarity:", score)
 
 # The diff image contains the actual image differences between the two images
@@ -33,6 +57,8 @@ print("Image similarity:", score)
 # [0,255] before we can use it with OpenCV
 diff = (diff * 255).astype("uint8")
 
+cv2.imwrite('DataSet/diff.png', diff) 
+
 #diff = cv2.medianBlur(diff, 7)
 
 # Threshold the difference image, followed by finding contours to
@@ -40,9 +66,13 @@ diff = (diff * 255).astype("uint8")
 thresh = cv2.threshold(diff, 20, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 #thresh = cv2.adaptiveThreshold(diff, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 111, 3)
 
+cv2.imwrite('DataSet/thresh.png', thresh) 
+
 # To filling circles
 kernel = np.ones((3,3), np.uint8)
-closing = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+
+cv2.imwrite('DataSet/opening.png', opening) 
 
 #erosion = cv2.erode(thresh, kernel, iterations = 2)
 #dilation = cv2.dilate(thresh, kernel, iterations = 2)
@@ -55,25 +85,26 @@ closing = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
 
 
 # Apply Hough transform on the blurred image. 
-detected_circles = cv2.HoughCircles(closing, cv2.HOUGH_GRADIENT, 1, 6, param1 = 30, param2 = 7, minRadius = 0, maxRadius = 8) 
-print("detected_circles:", detected_circles)
+#detectedCircles = cv2.HoughCircles(closing, cv2.HOUGH_GRADIENT, 1, 6, param1 = 30, param2 = 7, minRadius = 0, maxRadius = 8) 
+detectedCircles = cv2.HoughCircles(opening, cv2.HOUGH_GRADIENT, 1, 8, param1 = 30, param2 = 7, minRadius = 5, maxRadius = 12) 
+print("detected_circles:", detectedCircles)
 
 # Draw circles that are detected. 
-if detected_circles is not None: 
+if detectedCircles is not None: 
   
     # Convert the circle parameters a, b and r to integers. 
-    detected_circles = np.uint16(np.around(detected_circles)) 
+    detectedCircles = np.uint16(np.around(detectedCircles)) 
   
-    for pt in detected_circles[0, :]: 
+    for pt in detectedCircles[0, :]: 
         a, b, r = pt[0], pt[1], pt[2] 
   
         # Draw the circumference of the circle. 
-        cv2.circle(imageFire, (a, b), r, (0, 255, 0), 2) 
+        cv2.circle(warpFire, (a, b), r, (0, 0, 255), 2) 
   
         # Draw a small circle (of radius 1) to show the center. 
-        cv2.circle(imageFire, (a, b), 1, (0, 0, 255), 3) 
+        #cv2.circle(imageFire, (a, b), 1, (0, 0, 255), 3) 
 
-cv2.imshow("Detected Circle", imageFire) 
+cv2.imshow("Detected Circle", warpFire) 
 cv2.waitKey(0) 
 
 
@@ -92,7 +123,7 @@ for c in contours:
         cv2.drawContours(mask, [c], 0, (0,255,0), -1)
         cv2.drawContours(filled_after, [c], 0, (0,255,0), -1)
 
-cv2.imwrite('DataSet/Result.png', diff) 
+cv2.imwrite('DataSet/Result.png', warpFire) 
 #cv2.imshow('mask', mask)
 
 #cv2.imshow('before', imageBackground)
@@ -101,27 +132,6 @@ cv2.imwrite('DataSet/Result.png', diff)
 #cv2.imshow('mask', mask)
 #cv2.imshow('filled after', filled_after)
 cv2.waitKey(0)
-
-# Displays image
-plt.subplot(2, 2, 1), plt.imshow(imageFire, 'gray'), plt.title('Original'), plt.xticks([]), plt.yticks([])
-
-
-# Displays image
-plt.subplot(2, 2, 2), plt.imshow(grayFire, 'gray'), plt.title('Gray'), plt.xticks([]), plt.yticks([])
-
-rows,cols = grayFire.shape
-
-pointsSource = np.float32([[197,60],[1586,82],[1403, 992],[379,996]])
-pointsDestination = np.float32([[197,60],[1586,60],[1586, 1450],[197,1450]])
-
-M = cv2.getPerspectiveTransform(pointsSource, pointsDestination)
-
-transformed = np.zeros((1600,1600), np.uint8)
-dst = cv2.warpPerspective(grayFire, M, transformed.shape)
-
-# Displays image
-plt.subplot(2, 2, 3), plt.imshow(dst, 'gray'), plt.title('Dest'), plt.xticks([]), plt.yticks([])
-
 
 # Displays subplotted images
 # plt.show()
